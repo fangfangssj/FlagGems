@@ -344,7 +344,7 @@ def generate_pad_kernel(
         for i in range(1, rank):
             code.writeline(f"src_offset += src_index_{i} * in_strides{i}")
 
-        code.writeline(f"load_cond = src_index_{i} < x_shape{i}")
+        code.writeline("load_cond = src_index_0 < x_shape0")
         for i in range(1, rank):
             code.writeline(f"load_cond &= src_index_{i} < x_shape{i}")
 
