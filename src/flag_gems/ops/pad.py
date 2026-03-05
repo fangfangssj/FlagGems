@@ -158,6 +158,11 @@ def generate_destination_passing_padding_wrapper(
 
         code.newline()
 
+        code.writeline("# Check which dimensions have padding")
+        for i in range(rank):
+            code.writeline(
+                f"dim{i}_has_pad = pad_before[{i}] > 0 or pad_after[{i}] > 0"
+            )
         code.writeline("IS_CONSTANT = mode == 'constant'")
         code.writeline("IS_REFLECT = mode == 'reflect'")
         code.writeline("IS_REPLICATE = mode == 'replicate'")
@@ -192,6 +197,9 @@ def generate_destination_passing_padding_wrapper(
 
                     s = ", ".join(f"valid_dim{j}_end" for j in range(rank))
                     code.writeline(f"{s}, # valid dim end")
+
+                    s = ", ".join(f"bool(dim{i}_has_pad)" for i in range(rank))
+                    code.writeline(f"{s}, # dim has padding flags")
 
                     code.writeline("in0.numel(), ")
                     code.writeline("out0.numel(), ")
@@ -250,6 +258,9 @@ def generate_pad_kernel(
             stride_args = ", ".join(f"valid_dim{j}_end: int" for j in range(rank))
             code.writeline(f"{stride_args}, # valid dim end")
 
+            for i in range(rank):
+                code.writeline(f"dim{i}_has_pad: tl.constexpr, ")
+
             code.writeline("in_elem_cnt: tl.constexpr, ")
             code.writeline("out_elem_cnt: tl.constexpr, ")
             code.writeline("value, # padding value")
@@ -303,12 +314,12 @@ def generate_pad_kernel(
         with code.indent():
             for i in range(rank):
                 code.writeline(
-                    f"""src_index_{i} = tl.where(dst_index_{i} < valid_dim{i}_start,
+                    f"""src_index_{i} = tl.where(dim{i}_has_pad & (dst_index_{i} < valid_dim{i}_start),
                         valid_dim{i}_start - dst_index_{i}, src_index_{i})"""
                 )
             for i in range(rank):
                 code.writeline(
-                    f"""src_index_{i} = tl.where(dst_index_{i} >= valid_dim{i}_end,
+                    f"""src_index_{i} = tl.where(dim{i}_has_pad & (dst_index_{i} >= valid_dim{i}_end),
                     (x_shape{i} + valid_dim{i}_start - 1) * 2 - dst_index_{i} - valid_dim{i}_start, src_index_{i})"""
                 )
 
@@ -317,11 +328,13 @@ def generate_pad_kernel(
         with code.indent():
             for i in range(rank):
                 code.writeline(
-                    f"src_index_{i} = tl.where(dst_index_{i} < valid_dim{i}_start, 0, src_index_{i})"
+                    f"src_index_{i} = tl.where(dim{i}_has_pad & (dst_index_{i} < valid_dim{i}_start), 0, src_index_{i})"
                 )
             for i in range(rank):
+                end_cond = f"dst_index_{i} >= valid_dim{i}_end"
                 code.writeline(
-                    f"src_index_{i} = tl.where(dst_index_{i} >= valid_dim{i}_end, x_shape{i} - 1, src_index_{i})"
+                    f"src_index_{i} = tl.where(dim{i}_has_pad & ({end_cond}), "
+                    f"x_shape{i} - 1, src_index_{i})"
                 )
 
         code.newline()
@@ -329,12 +342,12 @@ def generate_pad_kernel(
         with code.indent():
             for i in range(rank):
                 code.writeline(
-                    f"""src_index_{i} = tl.where(dst_index_{i} < valid_dim{i}_start,
+                    f"""src_index_{i} = tl.where(dim{i}_has_pad & (dst_index_{i} < valid_dim{i}_start),
                         dst_index_{i} + x_shape{i} - valid_dim{i}_start, src_index_{i})"""
                 )
             for i in range(rank):
                 code.writeline(
-                    f"""src_index_{i} = tl.where(dst_index_{i} >= valid_dim{i}_end,
+                    f"""src_index_{i} = tl.where(dim{i}_has_pad & (dst_index_{i} >= valid_dim{i}_end),
                         dst_index_{i} - valid_dim{i}_end, src_index_{i})"""
                 )
 
