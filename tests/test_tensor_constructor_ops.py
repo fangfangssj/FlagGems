@@ -343,9 +343,7 @@ def test_accuracy_one_hot():
 )
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.int64])
 def test_accuracy_arange_start(start, end, step, dtype):
-    if dtype == torch.int64 and (
-        isinstance(start, float) or isinstance(end, float) or isinstance(step, float)
-    ):
+    if dtype == torch.int64 and isinstance(step, float) and int(step) == 0:
         with pytest.raises(RuntimeError):
             with flag_gems.use_gems():
                 torch.arange(start, end, step, dtype=dtype, device=device)
