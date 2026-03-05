@@ -29,6 +29,15 @@ def arange_start(
     start, end, step=1, *, dtype=None, layout=None, device=None, pin_memory=None
 ):
     logger.debug("GEMS ARANGE")
+    # Check for float step with int64 dtype - must raise error to match PyTorch behavior
+    # When step is float (e.g., 0.5) and dtype is int64, the float converts to int as 0
+    if dtype is torch.int64 and (
+        isinstance(step, float) or isinstance(start, float) or isinstance(end, float)
+    ):
+        # Convert to check what the effective integer step would be
+        int_step = int(step)
+        if int_step == 0:
+            raise RuntimeError("step must be nonzero")
     if dtype is torch.int64:
         sgn = (step > 0) - (step < 0)
         size = (end - start + step - sgn) // step
